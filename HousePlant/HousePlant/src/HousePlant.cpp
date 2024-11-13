@@ -82,7 +82,7 @@ void loop() {
 tempC = bme.readTemperature();
   tempF = (tempC*9/5)+32;
   currentTime = millis();
-    if((currentTime-lastSecond)>500) {
+    if ((currentTime-lastSecond)>500) {
       lastSecond = millis();
       display.clearDisplay();
       display.setCursor(0,0);
@@ -94,14 +94,14 @@ soilRead = analogRead(soilSensor);
 humid = bme.readHumidity();
 
 Serial.printf("Moisture Level = %i\n",soilRead);
-  if(soilRead>2000) {
+  if (soilRead>2000) {
     Serial.printf("pump on");
     digitalWrite(pump,HIGH);
     delay(500);
     digitalWrite(pump,LOW);
     }
 
-  if((millis()-pumpTimer)>500) {
+  if ((millis()-pumpTimer)>500) {
     Serial.printf("Pump Off");
     digitalWrite(pump,LOW);
     pumpTimer = millis();
@@ -117,5 +117,82 @@ Serial.printf("Moisture Level = %i\n",soilRead);
     else {
     digitalWrite(pump,LOW);
     }
+
+currentQual = aqSensor.slope();
+  if (currentQual>= 0) {
+    if (currentQual==3)
+      Serial.printf("Dangerous Pollution Levels! Force signal active\n");
+    else if (currentQual==2)
+      Serial.printf("Warning High pollution!\n");
+    else if (currentQual==1)
+      Serial.printf("Caution Low Pollution\n");
+    else if (currentQual==0)
+      Serial.printf("Fresh Air\n");
+  }
+
+WebPublish();
   
 }
+
+//END
+
+void WebPublish() {
+  static int tempTimer;
+  static int soilTimer;
+  static int humidTimer;
+  static int aqTimer;
+
+  if ((millis()-tempTimer>9000)) {
+    if (mqtt.Update()) {
+      pubTemp.publish(tempF);
+      Serial.printf("Publishing %0.2f\n",tempF);
+    }
+  tempTimer = millis();
+  }
+
+  if ((millis()-soilTimer>10000)) {
+    if (mqtt.Update()) {
+      pubMoist.publish(soilRead);
+      Serial.printf("Publishing soil moisture %i\n",soilRead);
+    }
+  soilTimer = millis();
+  }
+
+  if((millis()-humidTimer>11000)) {
+    if(mqtt.Update()) {
+      pubHumid.publish(humid);
+      Serial.printf("Publishing soil moisture %i\n",soilRead);
+    }
+  humidTimer = millis();
+  }
+
+  if((millis()-aqTimer>12000)) {
+    switch(currentQual) {
+      case 0:
+      if(mqtt.Update()) {
+        pubAQ.publish("Fresh Air");
+      }
+    break;
+
+      case 1:
+      if(mqtt.Update()) {
+        pubAQ.publish("Caution Low Pollution");
+      }
+    break;
+
+      case 2:
+      if(mqtt.Update()) {
+        pubAQ.publish("Warning High Pollution!");
+      }
+    break;
+
+      case 3:
+      if(mqtt.Update()) {
+        pubAQ.publish("Dangerous Pollution Levels");
+      }
+    break;
+
+    }
+  }
+}
+
