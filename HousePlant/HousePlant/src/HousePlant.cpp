@@ -94,7 +94,7 @@ Adafruit_MQTT_Subscribe *subscription;
     }
   }
 
-if (encoButton.isClicked()) {
+if (encoButton.isClicked() ||buttonOnOffValue ==1) {
     digitalWrite(pump,HIGH);
     Serial.printf("Pumping H20!\n");
     }
@@ -188,7 +188,7 @@ void WebPublish() {
   static int humidTimer;
   static int aqTimer;
 
-  if ((millis()-tempTimer>2000)) {
+  if ((millis()-tempTimer>5000)) {
     if (mqtt.Update()) {
       pubTemp.publish(tempF);
       Serial.printf("Publishing Temperature: %0.2f\n",tempF);
@@ -196,7 +196,7 @@ void WebPublish() {
   tempTimer = millis();
   }
 
-  if ((millis()-soilTimer>4000)) {
+  if ((millis()-soilTimer>10000)) {
     if (mqtt.Update()) {
       pubMoist.publish(soilRead);
       Serial.printf("Publishing Soil Moisture %i\n",soilRead);
@@ -204,7 +204,7 @@ void WebPublish() {
   soilTimer = millis();
   }
 
-  if((millis()-humidTimer>6000)) {
+  if((millis()-humidTimer>15000)) {
     if(mqtt.Update()) {
       pubHumid.publish(humid);
       Serial.printf("Publishing Humidity %i\n",soilRead);
@@ -212,33 +212,33 @@ void WebPublish() {
   humidTimer = millis();
   }
 
-  if((millis()-aqTimer>8000)) {
-    switch(currentQual) {
-      case 0:
-      if(mqtt.Update()) {
-        pubAQ.publish("Fresh Air");
-      }
-    break;
+  // if((millis()-aqTimer>8000)) {
+  //   switch(currentQual) {
+  //     case 0:
+  //     if(mqtt.Update()) {
+  //       pubAQ.publish("Fresh Air");
+  //     }
+  //   break;
 
-      case 1:
-      if(mqtt.Update()) {
-        pubAQ.publish("Caution Low Pollution");
-      }
-    break;
+  //     case 1:
+  //     if(mqtt.Update()) {
+  //       pubAQ.publish("Caution Low Pollution");
+  //     }
+  //   break;
 
-      case 2:
-      if(mqtt.Update()) {
-        pubAQ.publish("Warning High Pollution!");
-      }
-    break;
+  //     case 2:
+  //     if(mqtt.Update()) {
+  //       pubAQ.publish("Warning High Pollution!");
+  //     }
+  //   break;
 
-      case 3:
-      if(mqtt.Update()) {
-        pubAQ.publish("Dangerous Pollution Levels");
-      }
-    break;
+  //     case 3:
+  //     if(mqtt.Update()) {
+  //       pubAQ.publish("Dangerous Pollution Levels");
+  //     }
+  //   break;
 
-    }
-  }
+  //   }
+  // }
 }
 
