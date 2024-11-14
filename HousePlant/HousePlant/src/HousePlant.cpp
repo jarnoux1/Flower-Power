@@ -19,7 +19,7 @@
 #include "Adafruit_MQTT/Adafruit_MQTT_SPARK.h" 
 #include "Adafruit_MQTT/Adafruit_MQTT.h"
 
-SYSTEM_MODE(SEMI_AUTOMATIC);
+SYSTEM_MODE(AUTOMATIC);
 bool status;
 float tempC;
 float tempF;
@@ -43,12 +43,14 @@ const int pump = S1;
 Button encoButton(D3);
 const int OLED_RESET=-1;
 void WebPublish();
+void MQTT_connect();
+bool MQTT_ping();
 
 AirQualitySensor aqSensor(A2);
 TCPClient TheClient;
 Adafruit_MQTT_SPARK mqtt(&TheClient,AIO_SERVER,AIO_SERVERPORT,AIO_USERNAME,AIO_KEY);
 Adafruit_MQTT_Publish pubAQ = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/Air Quality");  
-Adafruit_MQTT_Publish pubTemp = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/Temp"); 
+Adafruit_MQTT_Publish pubTemp = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/Temperature"); 
 Adafruit_MQTT_Publish pubMoist = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/Soil Moisture"); 
 Adafruit_MQTT_Publish pubHumid = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/Humidity");
 Adafruit_BME280 bme;
@@ -67,7 +69,7 @@ status = bme.begin(0x76);
    display.clearDisplay();
    display.drawBitmap(0, 0, wheel, 128, 64, 1);
    display.display();
-   delay(1000);
+   delay(3000);
 
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.setTextSize(4);
@@ -79,8 +81,11 @@ status = bme.begin(0x76);
 }
 
 void loop() {
+MQTT_connect();
+MQTT_ping();
+
 tempC = bme.readTemperature();
-  tempF = (tempC*9/5)+32;
+  tempF = (tempC*9.0/5.0)+32;
   currentTime = millis();
     if ((currentTime-lastSecond)>500) {
       lastSecond = millis();
@@ -95,29 +100,25 @@ humid = bme.readHumidity();
 
 Serial.printf("Moisture Level = %i\n",soilRead);
   if (soilRead>2000) {
-    Serial.printf("pump on");
+    Serial.printf("Hydration Station!");
     digitalWrite(pump,HIGH);
     delay(500);
     digitalWrite(pump,LOW);
     }
 
   if ((millis()-pumpTimer)>500) {
-    Serial.printf("Pump Off");
     digitalWrite(pump,LOW);
     pumpTimer = millis();
     }
 
-  if (encoButton.isClicked()) {
-    onoff = !onoff;
-    }
-
-  if (onoff == true) {
+  if (encoButton.isPressed()) {
     digitalWrite(pump,HIGH);
+    Serial.printf("Pumping H20!\n");
     }
     else {
     digitalWrite(pump,LOW);
     }
-
+    
 currentQual = aqSensor.slope();
   if (currentQual>= 0) {
     if (currentQual==3)
@@ -135,6 +136,41 @@ WebPublish();
 }
 
 //END
+
+void MQTT_connect() {
+  int8_t ret;
+ 
+  // Return if already connected.
+  if (mqtt.connected()) {
+    return;
+  }
+ 
+  Serial.print("Connecting to MQTT... ");
+ 
+  while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
+       Serial.printf("Error Code %s\n",mqtt.connectErrorString(ret));
+       Serial.printf("Retrying MQTT connection in 5 seconds...\n");
+       mqtt.disconnect();
+       delay(5000);  // wait 5 seconds and try again
+  }
+  Serial.printf("MQTT Connected!\n");
+}
+
+bool MQTT_ping() {
+  static unsigned int last;
+  bool pingStatus;
+
+  if ((millis()-last)>120000) {
+      Serial.printf("Pinging MQTT \n");
+      pingStatus = mqtt.ping();
+      if(!pingStatus) {
+        Serial.printf("Disconnecting \n");
+        mqtt.disconnect();
+      }
+      last = millis();
+  }
+  return pingStatus;
+}
 
 void WebPublish() {
   static int tempTimer;
