@@ -41,6 +41,7 @@ char perc = 0x25;
 const int soilSensor = A1; 
 const int pump = S1;
 Button encoButton(D3);
+float buttonOnOffValue=D3;
 const int OLED_RESET=-1;
 void WebPublish();
 void MQTT_connect();
@@ -49,6 +50,7 @@ bool MQTT_ping();
 AirQualitySensor aqSensor(A2);
 TCPClient TheClient;
 Adafruit_MQTT_SPARK mqtt(&TheClient,AIO_SERVER,AIO_SERVERPORT,AIO_USERNAME,AIO_KEY);
+Adafruit_MQTT_Subscribe buttonOnOffFeed = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/feeds/buttonOnOff");
 Adafruit_MQTT_Publish pubAQ = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/Air Quality");  
 Adafruit_MQTT_Publish pubTemp = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/Temperature"); 
 Adafruit_MQTT_Publish pubMoist = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/Soil Moisture"); 
@@ -60,7 +62,8 @@ void setup() {
 Serial.begin(9600);
 waitFor(Serial.isConnected,10000);
   pinMode(pump,OUTPUT);
-  pinMode(soilSensor,INPUT); 
+  pinMode(soilSensor,INPUT);
+mqtt.subscribe(&buttonOnOffFeed);
 
 status = bme.begin(0x76);
     if (status == false) {
@@ -83,6 +86,21 @@ status = bme.begin(0x76);
 void loop() {
 MQTT_connect();
 MQTT_ping();
+
+Adafruit_MQTT_Subscribe *subscription;
+  while ((subscription = mqtt.readSubscription(100))) {
+    if (subscription == &buttonOnOffFeed) {
+      buttonOnOffValue = atof((char *)buttonOnOffFeed.lastread);
+    }
+  }
+
+if (encoButton.isClicked()) {
+    digitalWrite(pump,HIGH);
+    Serial.printf("Pumping H20!\n");
+    }
+    else {
+    digitalWrite(pump,LOW);
+    }
 
 tempC = bme.readTemperature();
   tempF = (tempC*9.0/5.0)+32;
@@ -110,14 +128,6 @@ Serial.printf("Moisture Level = %i\n",soilRead);
     digitalWrite(pump,LOW);
     pumpTimer = millis();
     }
-
-  if (encoButton.isPressed()) {
-    digitalWrite(pump,HIGH);
-    Serial.printf("Pumping H20!\n");
-    }
-    else {
-    digitalWrite(pump,LOW);
-    }
     
 currentQual = aqSensor.slope();
   if (currentQual>= 0) {
@@ -129,6 +139,7 @@ currentQual = aqSensor.slope();
       Serial.printf("Caution Low Pollution\n");
     else if (currentQual==0)
       Serial.printf("Fresh Air\n");
+
   }
 
 WebPublish();
@@ -140,18 +151,17 @@ WebPublish();
 void MQTT_connect() {
   int8_t ret;
  
-  // Return if already connected.
   if (mqtt.connected()) {
     return;
   }
  
   Serial.print("Connecting to MQTT... ");
  
-  while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
+  while ((ret = mqtt.connect()) != 0) { 
        Serial.printf("Error Code %s\n",mqtt.connectErrorString(ret));
        Serial.printf("Retrying MQTT connection in 5 seconds...\n");
        mqtt.disconnect();
-       delay(5000);  // wait 5 seconds and try again
+       delay(5000);  
   }
   Serial.printf("MQTT Connected!\n");
 }
@@ -178,31 +188,31 @@ void WebPublish() {
   static int humidTimer;
   static int aqTimer;
 
-  if ((millis()-tempTimer>9000)) {
+  if ((millis()-tempTimer>2000)) {
     if (mqtt.Update()) {
       pubTemp.publish(tempF);
-      Serial.printf("Publishing %0.2f\n",tempF);
+      Serial.printf("Publishing Temperature: %0.2f\n",tempF);
     }
   tempTimer = millis();
   }
 
-  if ((millis()-soilTimer>10000)) {
+  if ((millis()-soilTimer>4000)) {
     if (mqtt.Update()) {
       pubMoist.publish(soilRead);
-      Serial.printf("Publishing soil moisture %i\n",soilRead);
+      Serial.printf("Publishing Soil Moisture %i\n",soilRead);
     }
   soilTimer = millis();
   }
 
-  if((millis()-humidTimer>11000)) {
+  if((millis()-humidTimer>6000)) {
     if(mqtt.Update()) {
       pubHumid.publish(humid);
-      Serial.printf("Publishing soil moisture %i\n",soilRead);
+      Serial.printf("Publishing Humidity %i\n",soilRead);
     }
   humidTimer = millis();
   }
 
-  if((millis()-aqTimer>12000)) {
+  if((millis()-aqTimer>8000)) {
     switch(currentQual) {
       case 0:
       if(mqtt.Update()) {
