@@ -116,7 +116,7 @@ tempC = bme.readTemperature();
 soilRead = analogRead(soilSensor);
 humid = bme.readHumidity();
 
-Serial.printf("Moisture Level = %i\n",soilRead);
+Serial.printf("Soil Read = %i\n",soilRead);
   if (soilRead>2000) {
     Serial.printf("Hydration Station!");
     digitalWrite(pump,HIGH);
@@ -132,7 +132,7 @@ Serial.printf("Moisture Level = %i\n",soilRead);
 currentQual = aqSensor.slope();
   if (currentQual>= 0) {
     if (currentQual==3)
-      Serial.printf("Dangerous Pollution Levels! Force signal active\n");
+      Serial.printf("Dangerous Pollution Levels!\n");
     else if (currentQual==2)
       Serial.printf("Warning High pollution!\n");
     else if (currentQual==1)
@@ -186,7 +186,7 @@ void WebPublish() {
   static int tempTimer;
   static int soilTimer;
   static int humidTimer;
-  static int aqTimer;
+  //static int aqTimer;
 
   if ((millis()-tempTimer>5000)) {
     if (mqtt.Update()) {
